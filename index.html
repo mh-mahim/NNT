@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pro Number Tools | Admin Approval</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.51/libphonenumber-js.min.js"></script>
+    
+    <style>
+        /* Color Variables */
+        :root {
+            --md-sys-color-primary: #4a6b38;
+            --md-sys-color-on-primary: #ffffff;
+            --md-sys-color-primary-container: #cbf3af;
+            --md-sys-color-on-primary-container: #0c2000;
+            --md-sys-color-surface: #fafdf5; 
+            --md-sys-color-on-surface: #1a1c18;
+            --md-sys-color-surface-variant: #e2e4d9;
+            --md-sys-color-on-surface-variant: #44483d;
+            --md-sys-color-outline: #75786c;
+            --md-sys-color-error: #ba1a1a;
+            --md-sys-color-surface-container: #f0f3eb; 
+            --md-sys-color-success: #386a20;
+            --glass-bg: rgba(250, 253, 245, 0.8);
+        }
+
+        [data-theme="dark"] {
+            --md-sys-color-primary: #afd695;
+            --md-sys-color-on-primary: #1e370e;
+            --md-sys-color-primary-container: #335022;
+            --md-sys-color-on-primary-container: #cbf3af;
+            --md-sys-color-surface: #232621; 
+            --md-sys-color-on-surface: #e2e3df;
+            --md-sys-color-surface-variant: #44483d;
+            --md-sys-color-on-surface-variant: #c4c8bc;
+            --md-sys-color-outline: #8e9285;
+            --md-sys-color-error: #ffb4ab;
+            --md-sys-color-surface-container: #1a1d18; 
+            --md-sys-color-success: #8ac76b;
+            --glass-bg: rgba(35, 38, 33, 0.8);
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--md-sys-color-surface-container);
+            color: var(--md-sys-color-on-surface);
+            margin: 0; padding: 0;
+            display: flex; flex-direction: column;
+            min-height: 100vh;
+            transition: background-color 0.4s ease, color 0.4s ease;
+        }
+
+        /* Animations */
+        @keyframes fadeInSlide {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes gradientLoop {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.9) translate(-50%, -50%); opacity: 0; }
+            100% { transform: scale(1) translate(-50%, -50%); opacity: 1; }
+        }
+
+        /* Header */
+        .top-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            width: calc(100% - 32px); margin: 16px auto; padding: 16px 24px;
+            background: linear-gradient(-45deg, var(--md-sys-color-primary), var(--md-sys-color-success), var(--md-sys-color-primary));
+            background-size: 200% 200%;
+            animation: gradientLoop 8s ease infinite;
+            color: var(--md-sys-color-on-primary);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            position: sticky; top: 16px; border-radius: 24px; z-index: 1000;
+            box-sizing: border-box;
+        }
+
+        .icon-btn {
+            background: transparent; border: none; color: white; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; padding: 8px;
+            border-radius: 50%; transition: 0.3s;
+        }
+        .icon-btn:hover { background: rgba(255,255,255,0.2); }
+
+        /* Auth Containers */
+        #auth-container {
+            display: flex; flex: 1; align-items: center; justify-content: center; padding: 20px;
+            position: relative; overflow: hidden;
+        }
+
+        .auth-view {
+            background-color: var(--md-sys-color-surface);
+            border: 1px solid var(--md-sys-color-surface-variant);
+            border-radius: 28px; padding: 40px 32px;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.05);
+            width: 100%; max-width: 420px; box-sizing: border-box;
+            position: absolute;
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            text-align: center;
+        }
+
+        .auth-view.hidden-left { transform: translateX(-150%); opacity: 0; pointer-events: none; }
+        .auth-view.hidden-right { transform: translateX(150%); opacity: 0; pointer-events: none; }
+        .auth-view.active { transform: translateX(0); opacity: 1; pointer-events: auto; position: relative; }
+
+        .auth-icon-wrapper {
+            background: var(--md-sys-color-primary-container);
+            width: 80px; height: 80px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 24px;
+        }
+
+        /* Inputs & Buttons */
+        .md-input {
+            width: 100%; padding: 16px; border: 1.5px solid var(--md-sys-color-outline);
+            border-radius: 14px; font-size: 16px; box-sizing: border-box;
+            margin-bottom: 16px; background: transparent; color: var(--md-sys-color-on-surface);
+            transition: 0.3s; font-family: 'Roboto', sans-serif;
+        }
+        .md-input:focus { outline: none; border-color: var(--md-sys-color-primary); box-shadow: 0 0 0 4px rgba(74, 107, 56, 0.1); }
+        .md-input::placeholder { color: var(--md-sys-color-outline); }
+
+        .md-btn {
+            background-color: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary);
+            border: none; border-radius: 100px; padding: 16px 28px; font-size: 16px; font-weight: 600;
+            cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+            gap: 10px; transition: 0.3s; width: 100%; font-family: 'Roboto', sans-serif;
+        }
+        .md-btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+        
+        .md-btn-outline {
+            background-color: transparent; border: 1.5px solid var(--md-sys-color-primary);
+            color: var(--md-sys-color-primary);
+        }
+        .md-btn-outline:hover { background-color: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+
+        .md-btn-text {
+            background: none; border: none; color: var(--md-sys-color-primary);
+            font-weight: 600; cursor: pointer; margin-top: 20px; font-size: 14px; padding: 10px; border-radius: 8px;
+            transition: 0.3s;
+        }
+        .md-btn-text:hover { background: var(--md-sys-color-surface-variant); }
+
+        /* Main App Content */
+        #app-content { display: none; padding: 24px 16px; align-items: center; flex-direction: column; }
+        .container { width: 100%; max-width: 800px; }
+
+        .tabs-container {
+            display: flex; background: var(--md-sys-color-surface); padding: 6px; 
+            border-radius: 100px; margin-bottom: 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .tab-btn {
+            flex: 1; padding: 14px; border: none; border-radius: 100px; background: transparent;
+            color: var(--md-sys-color-on-surface-variant); cursor: pointer; transition: 0.3s;
+            font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 15px;
+        }
+        .tab-btn.active { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+
+        .tab-panel { display: none; animation: fadeInSlide 0.4s ease; }
+        .tab-panel.active { display: block; }
+
+        .tool-card {
+            background: var(--md-sys-color-surface); padding: 28px; border-radius: 28px;
+            border: 1px solid var(--md-sys-color-surface-variant); margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+        }
+
+        .action-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .action-label { font-weight: 600; font-size: 15px; color: var(--md-sys-color-on-surface); }
+        .action-link { background:transparent; border:none; color:var(--md-sys-color-primary); cursor:pointer; font-weight:bold; display:flex; align-items:center; gap:4px; font-size: 14px; padding: 6px 12px; border-radius: 100px; transition: 0.2s; }
+        .action-link:hover { background: var(--md-sys-color-primary-container); }
+
+        /* Results Accordion */
+        .result-item {
+            background: var(--md-sys-color-surface); border: 1px solid var(--md-sys-color-surface-variant);
+            border-radius: 20px; margin-bottom: 16px; overflow: hidden; transition: 0.3s;
+        }
+        .result-item.expanded { box-shadow: 0 8px 24px rgba(0,0,0,0.08); border-color: var(--md-sys-color-primary); }
+        
+        .result-header {
+            padding: 20px; display: flex; justify-content: space-between; align-items: center;
+            cursor: pointer; background: var(--md-sys-color-surface); transition: 0.3s;
+        }
+        .result-header:hover { background: var(--md-sys-color-surface-variant); }
+        .result-title { font-size: 16px; font-weight: 700; color: var(--md-sys-color-on-surface); margin: 0 0 4px 0; }
+        .result-subtitle { font-size: 13px; color: var(--md-sys-color-on-surface-variant); margin: 0; }
+        
+        .result-actions { display: flex; gap: 8px; align-items: center; }
+        .circle-btn {
+            width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+            display: flex; align-items: center; justify-content: center; transition: 0.3s;
+        }
+        .circle-btn.primary { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+        .circle-btn.primary:hover { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+        
+        .expand-icon { transition: transform 0.3s; color: var(--md-sys-color-outline); }
+        .result-item.expanded .expand-icon { transform: rotate(180deg); color: var(--md-sys-color-primary); }
+
+        .result-body {
+            padding: 0 20px 20px 20px; display: none; border-top: 1px solid var(--md-sys-color-surface-variant);
+            background: var(--md-sys-color-surface-container);
+        }
+        .result-item.expanded .result-body { display: block; animation: fadeInSlide 0.3s ease; }
+        
+        .result-textarea {
+            width: 100%; height: 150px; padding: 16px; border: 1px solid var(--md-sys-color-outline);
+            border-radius: 12px; background: var(--md-sys-color-surface); color: var(--md-sys-color-on-surface);
+            font-family: monospace; font-size: 14px; resize: vertical; box-sizing: border-box; margin-top: 20px;
+        }
+
+        /* Custom Modal (Alert Replacement) */
+        #custom-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+            display: none; z-index: 6000; align-items: center; justify-content: center;
+        }
+        .custom-modal {
+            background: var(--md-sys-color-surface); width: 90%; max-width: 380px;
+            border-radius: 28px; padding: 32px; text-align: center;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transform: scale(0.9) translate(-50%, -50%); opacity: 0;
+            position: absolute; top: 50%; left: 50%;
+            transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .custom-modal.show { transform: scale(1) translate(-50%, -50%); opacity: 1; }
+        
+        .modal-icon { font-size: 48px; margin-bottom: 16px; }
+        .modal-icon.error { color: var(--md-sys-color-error); }
+        .modal-icon.success { color: var(--md-sys-color-success); }
+        .modal-icon.info { color: var(--md-sys-color-primary); }
+        
+        .modal-title { font-size: 20px; font-weight: 700; margin: 0 0 12px 0; color: var(--md-sys-color-on-surface); }
+        .modal-message { font-size: 15px; line-height: 1.5; color: var(--md-sys-color-on-surface-variant); margin: 0 0 24px 0; }
+
+        /* Toast */
+        .toast { 
+            position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%) translateY(100px); 
+            background: var(--md-sys-color-on-surface); color: var(--md-sys-color-surface); 
+            padding: 14px 28px; border-radius: 100px; font-weight: 600; font-size: 14px;
+            z-index: 5000; box-shadow: 0 10px 20px rgba(0,0,0,0.15);
+            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+            opacity: 0; display: flex; align-items: center; gap: 8px;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+        /* Loader */
+        #global-loader {
+            position: fixed; top:0; left:0; width:100%; height:100%; background: var(--glass-bg);
+            backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .spinner { width: 48px; height: 48px; border: 5px solid var(--md-sys-color-primary-container); border-top-color: var(--md-sys-color-primary); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Footer */
+        .footer { padding: 32px 16px; text-align: center; margin-top: auto; }
+        .tg-link {
+            display: inline-flex; align-items: center; gap: 8px; text-decoration: none;
+            background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container);
+            padding: 12px 24px; border-radius: 100px; font-weight: 600; transition: 0.3s;
+        }
+        .tg-link:hover { transform: translateY(-3px); box-shadow: 0 6px 15px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+
+    <div id="global-loader"><div class="spinner"></div></div>
+
+    <div id="toast" class="toast"><span class="material-symbols-outlined" id="toast-icon">info</span> <span id="toast-msg"></span></div>
+
+    <div id="custom-modal-overlay">
+        <div class="custom-modal" id="custom-modal">
+            <span class="material-symbols-outlined modal-icon" id="modal-icon">info</span>
+            <h3 class="modal-title" id="modal-title">Notice</h3>
+            <p class="modal-message" id="modal-message">Message goes here</p>
+            <button class="md-btn" onclick="closeModal()">OK</button>
+        </div>
+    </div>
+
+    <header class="top-bar">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="material-symbols-outlined" style="font-size: 28px;">admin_panel_settings</span>
+            <strong style="font-size: 18px; letter-spacing: 0.5px;">Number Tools Pro</strong>
+        </div>
+        <div style="display: flex; gap: 8px;">
+            <button class="icon-btn" onclick="toggleTheme()" title="Theme">
+                <span class="material-symbols-outlined" id="theme-icon">dark_mode</span>
+            </button>
+            <button id="logout-btn" class="icon-btn" onclick="handleLogout()" title="Logout" style="display: none;">
+                <span class="material-symbols-outlined">logout</span>
+            </button>
+        </div>
+    </header>
+
+    <div id="auth-container">
+        <div class="auth-view active" id="view-login">
+            <div class="auth-icon-wrapper">
+                <span class="material-symbols-outlined" style="font-size: 40px; color: var(--md-sys-color-primary);">lock</span>
+            </div>
+            <h2 style="margin: 0 0 8px 0;">Welcome Back</h2>
+            <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 32px; font-size: 15px;">Sign in to access pro tools.</p>
+            
+            <input type="email" id="login-email" class="md-input" placeholder="Email Address" autocomplete="email">
+            <div style="position: relative;">
+                <input type="password" id="login-pass" class="md-input" placeholder="Password" style="padding-right: 50px;">
+                <span class="material-symbols-outlined" onclick="togglePass('login-pass')" style="position: absolute; right: 16px; top: 16px; cursor: pointer; color: var(--md-sys-color-outline); user-select: none;">visibility_off</span>
+            </div>
+
+            <button class="md-btn" onclick="handleLogin()">
+                <span class="material-symbols-outlined">login</span> Unlock Tools
+            </button>
+            <div style="margin-top: 16px;">
+                <button class="md-btn-text" onclick="switchAuthView('signup')">Don't have an account? Request access</button>
+            </div>
+        </div>
+
+        <div class="auth-view hidden-right" id="view-signup">
+            <div class="auth-icon-wrapper">
+                <span class="material-symbols-outlined" style="font-size: 40px; color: var(--md-sys-color-primary);">person_add</span>
+            </div>
+            <h2 style="margin: 0 0 8px 0;">Request Access</h2>
+            <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 32px; font-size: 15px;">Submit your details for admin approval.</p>
+            
+            <input type="text" id="signup-name" class="md-input" placeholder="Your Full Name" autocomplete="name">
+            <input type="email" id="signup-email" class="md-input" placeholder="Email Address" autocomplete="email">
+            
+            <div style="display: flex; gap: 12px;">
+                <div style="position: relative; flex: 1;">
+                    <input type="password" id="signup-pass" class="md-input" placeholder="Password">
+                </div>
+                <div style="position: relative; flex: 1;">
+                    <input type="password" id="signup-confirm" class="md-input" placeholder="Confirm">
+                </div>
+            </div>
+
+            <button class="md-btn" onclick="handleSignUp()">
+                <span class="material-symbols-outlined">send</span> Submit Request
+            </button>
+            <div style="margin-top: 16px;">
+                <button class="md-btn-text" onclick="switchAuthView('login')">
+                    <span class="material-symbols-outlined" style="font-size: 18px; vertical-align: middle;">arrow_back</span> Back to Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <main id="app-content">
+        <div class="container">
+            <div class="tabs-container">
+                <button class="tab-btn active" onclick="switchTab('tab-cc', this)">
+                    <span class="material-symbols-outlined">cleaning_services</span> CC Remover
+                </button>
+                <button class="tab-btn" onclick="switchTab('tab-filter', this)">
+                    <span class="material-symbols-outlined">filter_list</span> Number Filter
+                </button>
+            </div>
+
+            <div id="tab-cc" class="tab-panel active">
+                <div class="tool-card">
+                    <h2 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-outlined" style="color: var(--md-sys-color-primary);">public</span> 
+                        Country Code Remover
+                    </h2>
+                    <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px;">Extract and organize mixed international numbers automatically.</p>
+                    
+                    <div style="display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 24px; padding: 16px; border: 1.5px dashed var(--md-sys-color-outline); border-radius: 16px;">
+                        <input type="file" id="file-input" style="display: none;" accept=".txt,.csv" onchange="handleFile(event)">
+                        <label for="file-input" class="md-btn md-btn-outline" style="width: auto; padding: 10px 20px;">
+                            <span class="material-symbols-outlined">upload_file</span> Choose File
+                        </label>
+                        <span id="file-name" style="font-size: 14px; color: var(--md-sys-color-on-surface-variant); font-weight: 500;">No file selected</span>
+                    </div>
+
+                    <div class="action-row">
+                        <label class="action-label">Or Paste Numbers Directly</label>
+                        <button class="action-link" onclick="doPaste('raw-numbers')">
+                            <span class="material-symbols-outlined" style="font-size: 18px;">content_paste</span> Paste
+                        </button>
+                    </div>
+                    <textarea id="raw-numbers" class="md-input" rows="6" placeholder="Format: +1234567890 or mixed text with numbers..."></textarea>
+                    
+                    <div style="display: flex; gap: 16px; margin-top: 8px;">
+                        <button class="md-btn" style="background: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant);" onclick="clearFields('cc')">Clear</button>
+                        <button class="md-btn" style="flex: 2;" onclick="processCC()">
+                            <span class="material-symbols-outlined">auto_fix_high</span> Process Numbers
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="cc-results"></div>
+            </div>
+
+            <div id="tab-filter" class="tab-panel">
+                <div class="tool-card">
+                    <h2 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                        <span class="material-symbols-outlined" style="color: var(--md-sys-color-primary);">difference</span> 
+                        Number Filter Pro
+                    </h2>
+                    <p style="color: var(--md-sys-color-on-surface-variant); margin-bottom: 24px;">Compare Total List with Used List to extract fresh, unused numbers.</p>
+                    
+                    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px;">
+                        <div style="flex: 1; min-width: 250px;">
+                            <div class="action-row">
+                                <label class="action-label">📥 Total Numbers</label>
+                                <button class="action-link" onclick="doPaste('total-numbers')">Paste</button>
+                            </div>
+                            <textarea id="total-numbers" class="md-input" rows="7" placeholder="Paste full database here..."></textarea>
+                        </div>
+                        <div style="flex: 1; min-width: 250px;">
+                            <div class="action-row">
+                                <label class="action-label">✅ Used Numbers</label>
+                                <button class="action-link" onclick="doPaste('used-numbers')">Paste</button>
+                            </div>
+                            <textarea id="used-numbers" class="md-input" rows="7" placeholder="Paste already used numbers here..."></textarea>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 16px;">
+                        <button class="md-btn" style="background: var(--md-sys-color-surface-variant); color: var(--md-sys-color-on-surface-variant);" onclick="clearFields('filter')">Clear</button>
+                        <button class="md-btn" style="flex: 2;" onclick="processFilter()">
+                            <span class="material-symbols-outlined">filter_alt</span> Find Unused Numbers
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="filter-stats" style="display:none; text-align:center; padding: 16px; background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); border-radius:16px; margin-bottom:24px; font-weight: 500; font-size: 16px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);"></div>
+                <div id="filter-results"></div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <a href="https://t.me/mh_mahim" target="_blank" class="tg-link">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.894 8.221l-1.97 9.28c-.145.658-.537.818-1.084.508l-3-2.21-1.446 1.394c-.14.18-.357.295-.6.295-.002 0-.003 0-.005 0l.213-3.054 5.56-5.022c.24-.213-.054-.334-.373-.121l-6.869 4.326-2.96-.924c-.64-.203-.658-.64.135-.954l11.566-4.458c.538-.196 1.006.128.832.94z"/></svg>
+            Developer: @mh_mahim
+        </a>
+        <div style="margin-top: 16px; font-size: 13px; color: var(--md-sys-color-on-surface-variant); font-weight: 500;">&copy; 2026 Pro Number Tools. Secured by Firebase.</div>
+    </footer>
+
+    <script>
+        // --- Custom UI Controllers (Modal & Toast) ---
+        function showCustomAlert(title, message, type = 'info') {
+            const overlay = document.getElementById('custom-modal-overlay');
+            const modal = document.getElementById('custom-modal');
+            const icon = document.getElementById('modal-icon');
+            
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            
+            icon.className = 'material-symbols-outlined modal-icon ' + type;
+            if(type === 'error') icon.textContent = 'error';
+            else if(type === 'success') icon.textContent = 'check_circle';
+            else icon.textContent = 'info';
+
+            overlay.style.display = 'flex';
+            setTimeout(() => modal.classList.add('show'), 10);
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('custom-modal');
+            modal.classList.remove('show');
+            setTimeout(() => document.getElementById('custom-modal-overlay').style.display = 'none', 300);
+        }
+
+        function showToast(msg, type = 'success') {
+            const t = document.getElementById('toast');
+            document.getElementById('toast-msg').textContent = msg;
+            const icon = document.getElementById('toast-icon');
+            
+            if(type === 'error') { t.style.background = 'var(--md-sys-color-error)'; icon.textContent = 'warning'; }
+            else if(type === 'info') { t.style.background = 'var(--md-sys-color-primary)'; icon.textContent = 'info'; }
+            else { t.style.background = 'var(--md-sys-color-success)'; icon.textContent = 'check_circle'; }
+            
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3500);
+        }
+
+        // --- Network Connectivity Check ---
+        function isOnline() {
+            if (!navigator.onLine) {
+                showCustomAlert("No Internet", "Please check your internet connection and try again.", "error");
+                return false;
+            }
+            return true;
+        }
+
+        // --- FIREBASE CONFIGURATION ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfOKtrRieiAwUzvs4QtFLigavwnLgcwbI",
+            authDomain: "number-tools-mahim.firebaseapp.com",
+            projectId: "number-tools-mahim",
+            storageBucket: "number-tools-mahim.firebasestorage.app",
+            messagingSenderId: "57927718534",
+            appId: "1:57927718534:web:911baca0a09f0124c96307",
+            measurementId: "G-GGK9MHER91"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // --- Session Management ---
+        let currentSessionId = localStorage.getItem('session_id') || Math.random().toString(36).substring(7);
+        localStorage.setItem('session_id', currentSessionId);
+
+        auth.onAuthStateChanged(user => {
+            document.getElementById('global-loader').style.display = 'none';
+            if (user) {
+                if(isOnline()) checkAccess(user);
+            } else {
+                showAppMode(false);
+            }
+        });
+
+        // --- UI View Switchers ---
+        function switchAuthView(view) {
+            const login = document.getElementById('view-login');
+            const signup = document.getElementById('view-signup');
+            
+            if(view === 'signup') {
+                login.classList.remove('active');
+                login.classList.add('hidden-left');
+                signup.classList.remove('hidden-right');
+                signup.classList.add('active');
+            } else {
+                signup.classList.remove('active');
+                signup.classList.add('hidden-right');
+                login.classList.remove('hidden-left');
+                login.classList.add('active');
+            }
+        }
+
+        function showAppMode(isLoggedIn) {
+            document.getElementById('auth-container').style.display = isLoggedIn ? 'none' : 'flex';
+            document.getElementById('app-content').style.display = isLoggedIn ? 'flex' : 'none';
+            document.getElementById('logout-btn').style.display = isLoggedIn ? 'flex' : 'none';
+            if(!isLoggedIn) {
+                switchAuthView('login');
+                document.getElementById('login-pass').value = '';
+            }
+        }
+
+        // --- Auth Operations ---
+        async function handleSignUp() {
+            if(!isOnline()) return;
+
+            const name = document.getElementById('signup-name').value.trim();
+            const email = document.getElementById('signup-email').value.trim();
+            const pass = document.getElementById('signup-pass').value;
+            const confirm = document.getElementById('signup-confirm').value;
+
+            if(!name || !email || !pass) return showCustomAlert("Missing Fields", "Please fill out all the fields to continue.", "error");
+            if(pass !== confirm) return showCustomAlert("Password Mismatch", "Passwords do not match. Please re-type.", "error");
+            if(pass.length < 6) return showCustomAlert("Weak Password", "Password must be at least 6 characters long.", "error");
+
+            document.getElementById('global-loader').style.display = 'flex';
+            try {
+                const cred = await auth.createUserWithEmailAndPassword(email, pass);
+                await db.collection('users').doc(cred.user.uid).set({
+                    name: name,
+                    email: email,
+                    status: 'pending',
+                    created_at: firebase.firestore.FieldValue.serverTimestamp(),
+                    last_active: firebase.firestore.FieldValue.serverTimestamp(),
+                    current_session: currentSessionId
+                });
+                auth.signOut();
+                showCustomAlert("Request Submitted!", "Your account has been created successfully. Please wait for Admin (Mahim) to approve your access.", "success");
+                switchAuthView('login');
+            } catch (e) { 
+                handleFirebaseError(e); 
+            } finally { 
+                document.getElementById('global-loader').style.display = 'none'; 
+            }
+        }
+
+        async function handleLogin() {
+            if(!isOnline()) return;
+
+            const email = document.getElementById('login-email').value.trim();
+            const pass = document.getElementById('login-pass').value;
+            if(!email || !pass) return showCustomAlert("Credentials Required", "Enter both email and password.", "info");
+            
+            document.getElementById('global-loader').style.display = 'flex';
+            try { 
+                await auth.signInWithEmailAndPassword(email, pass); 
+            } catch (e) { 
+                document.getElementById('global-loader').style.display = 'none';
+                handleFirebaseError(e);
+            }
+        }
+
+        async function checkAccess(user) {
+            try {
+                const snap = await db.collection('users').doc(user.uid).get();
+                if(!snap.exists) { 
+                    showCustomAlert("Access Denied", "No profile found in database. Contact Admin.", "error");
+                    auth.signOut(); return; 
+                }
+                
+                const data = snap.data();
+                const now = Date.now();
+
+                if(data.status === 'pending') { 
+                    showCustomAlert("Approval Pending", "Your account is not approved yet. Please wait for Mahim.", "info");
+                    auth.signOut(); return; 
+                }
+                if(data.status !== 'active') { 
+                    showCustomAlert("Account Inactive", "Your account has been restricted.", "error");
+                    auth.signOut(); return; 
+                }
+                
+                // 7 Days Auto-deactivation logic (7 days = 604800000 ms)
+                if(data.last_active && (now - data.last_active.toMillis() > 604800000)) {
+                    await db.collection('users').doc(user.uid).update({status: 'inactive'});
+                    showCustomAlert("Session Expired", "Account deactivated due to 7 days of inactivity. Contact Admin.", "error");
+                    auth.signOut(); return;
+                }
+
+                // Single Device Logic
+                if(data.current_session && data.current_session !== currentSessionId) {
+                    showCustomAlert("Security Alert", "Your account logged in from another device. This session is terminated.", "error");
+                    auth.signOut(); return;
+                }
+
+                // Update Session Activity
+                await db.collection('users').doc(user.uid).update({
+                    last_active: firebase.firestore.FieldValue.serverTimestamp(),
+                    current_session: currentSessionId
+                });
+
+                showAppMode(true);
+                showToast(`Welcome back, ${data.name}! 👋`, 'info');
+            } catch (error) {
+                handleFirebaseError(error);
+                auth.signOut();
+            }
+        }
+
+        function handleLogout() { auth.signOut(); showToast("Logged out successfully"); }
+
+        function handleFirebaseError(error) {
+            let msg = error.message;
+            if(error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+                msg = "Invalid email or password. Try again.";
+            } else if(msg.toLowerCase().includes("offline") || error.code === 'unavailable') {
+                msg = "Cannot connect to server. Please check your internet connection.";
+            }
+            showCustomAlert("Authentication Error", msg, "error");
+        }
+
+        // --- Core UI Interactions ---
+        function toggleTheme() {
+            const h = document.documentElement;
+            const icon = document.getElementById('theme-icon');
+            if(h.getAttribute('data-theme') === 'light') {
+                h.setAttribute('data-theme', 'dark'); icon.textContent = 'light_mode';
+            } else {
+                h.setAttribute('data-theme', 'light'); icon.textContent = 'dark_mode';
+            }
+        }
+
+        function togglePass(id) {
+            const input = document.getElementById(id);
+            input.type = input.type === 'password' ? 'text' : 'password';
+        }
+
+        function switchTab(id, btn) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            btn.classList.add('active');
+        }
+
+        async function doPaste(id) {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById(id).value = text;
+                showToast("Pasted from clipboard!");
+            } catch(e) { showCustomAlert("Clipboard Error", "Browser denied permission to read clipboard.", "error"); }
+        }
+
+        function clearFields(type) {
+            if(type === 'cc') {
+                document.getElementById('raw-numbers').value = '';
+                document.getElementById('cc-results').innerHTML = '';
+                document.getElementById('file-name').textContent = 'No file selected';
+                document.getElementById('file-input').value = '';
+            } else {
+                document.getElementById('total-numbers').value = '';
+                document.getElementById('used-numbers').value = '';
+                document.getElementById('filter-results').innerHTML = '';
+                document.getElementById('filter-stats').style.display = 'none';
+            }
+            showToast("Fields cleared");
+        }
+
+        function handleFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            document.getElementById('file-name').textContent = file.name;
+            const reader = new FileReader();
+            reader.onload = function(e) { document.getElementById('raw-numbers').value = e.target.result; };
+            reader.readAsText(file);
+        }
+
+        function toggleAccordion(header) {
+            const item = header.parentElement;
+            item.classList.toggle('expanded');
+        }
+
+        function copyToClipboard(textId) {
+            const text = document.getElementById(textId).value;
+            navigator.clipboard.writeText(text).then(() => {
+                showToast("Copied to clipboard!");
+            }).catch(err => {
+                showCustomAlert("Copy Failed", "Could not copy text.", "error");
+            });
+        }
+
+        // --- Number Processing Logic ---
+        function parseLine(line) {
+            let range = "", payterm = "", num = line.trim();
+            if(line.includes('\t')) {
+                const p = line.split('\t').map(x => x.trim()).filter(x => x);
+                let idx = p.findIndex(x => x.replace(/\D/g,'').length >= 6);
+                if(idx !== -1) {
+                    num = p[idx];
+                    if(idx > 0) range = p[0];
+                    if(idx < p.length - 1) payterm = p[idx+1];
+                }
+            }
+            return { num, range, payterm };
+        }
+
+        function processCC() {
+            const raw = document.getElementById('raw-numbers').value;
+            if(!raw.trim()) return showCustomAlert("Empty Input", "Please paste or upload some numbers first.", "info");
+            
+            document.getElementById('global-loader').style.display = 'flex';
+            setTimeout(() => {
+                const lines = raw.split('\n');
+                const groups = {};
+                const regionNames = new Intl.DisplayNames(['en'], {type: 'region'});
+
+                lines.forEach(l => {
+                    if(!l.trim() || l.toLowerCase().includes('range')) return;
+                    let { num, range, payterm } = parseLine(l);
+                    if(!num.startsWith('+')) num = '+' + num;
+                    try {
+                        const parsed = libphonenumber.parsePhoneNumber(num);
+                        if(parsed.isValid()) {
+                            const country = regionNames.of(parsed.country);
+                            const key = `${country}|||${range}|||${payterm}`;
+                            if(!groups[key]) groups[key] = { country, range, payterm, nums: [] };
+                            if(!groups[key].nums.includes(parsed.nationalNumber)) groups[key].nums.push(parsed.nationalNumber);
+                        }
+                    } catch(e){}
+                });
+
+                renderResults(groups, 'cc-results');
+                document.getElementById('global-loader').style.display = 'none';
+                showToast("Processing Complete!");
+            }, 100); // slight delay to allow loader render
+        }
+
+        function processFilter() {
+            const totalRaw = document.getElementById('total-numbers').value;
+            const usedRaw = document.getElementById('used-numbers').value;
+            if(!totalRaw.trim()) return showCustomAlert("Missing Data", "Total numbers list is required.", "info");
+            
+            document.getElementById('global-loader').style.display = 'flex';
+            setTimeout(() => {
+                const usedSet = new Set(usedRaw.split(/[\n,\t;]+/).map(x => x.trim().replace(/\D/g,'')));
+                const lines = totalRaw.split('\n');
+                const groups = {};
+                const regionNames = new Intl.DisplayNames(['en'], {type: 'region'});
+                let count = 0;
+
+                lines.forEach(l => {
+                    if(!l.trim()) return;
+                    let { num, range, payterm } = parseLine(l);
+                    if(!num.startsWith('+')) num = '+' + num;
+                    try {
+                        const parsed = libphonenumber.parsePhoneNumber(num);
+                        const national = parsed.nationalNumber;
+                        if(parsed.isValid() && !usedSet.has(national)) {
+                            const country = regionNames.of(parsed.country);
+                            const key = `${country}|||${range}|||${payterm}`;
+                            if(!groups[key]) groups[key] = { country, range, payterm, nums: [] };
+                            if(!groups[key].nums.includes(national)) {
+                                groups[key].nums.push(national);
+                                count++;
+                            }
+                        }
+                    } catch(e){}
+                });
+
+                const stats = document.getElementById('filter-stats');
+                stats.style.display = 'block';
+                stats.innerHTML = `Found <b style="font-size: 20px;">${count}</b> fresh/unused numbers!`;
+                renderResults(groups, 'filter-results');
+                document.getElementById('global-loader').style.display = 'none';
+                showToast("Filter Complete!");
+            }, 100);
+        }
+
+        function renderResults(groups, containerId) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            let idx = 0;
+            
+            for(const k in groups) {
+                const g = groups[k];
+                idx++;
+                const safeRange = g.range.replace(/['"\\]/g, "");
+                const safePayterm = g.payterm.replace(/['"\\]/g, "");
+                const textId = `res-text-${containerId}-${idx}`;
+                const rawData = g.nums.join('\n');
+                
+                const card = document.createElement('div');
+                card.className = 'result-item';
+                card.innerHTML = `
+                    <div class="result-header" onclick="toggleAccordion(this)">
+                        <div>
+                            <h3 class="result-title">${g.country} ${g.range ? ' | '+g.range : ''}</h3>
+                            <p class="result-subtitle">Total Valid: ${g.nums.length} ${g.payterm ? '• Payterm: '+g.payterm : ''}</p>
+                        </div>
+                        <div class="result-actions">
+                            <button class="circle-btn primary" onclick="event.stopPropagation(); downloadFile('${g.country}', \`${rawData}\`, ${g.nums.length}, '${safeRange}', '${safePayterm}')" title="Download TXT">
+                                <span class="material-symbols-outlined">download</span>
+                            </button>
+                            <span class="material-symbols-outlined expand-icon">expand_more</span>
+                        </div>
+                    </div>
+                    <div class="result-body">
+                        <textarea id="${textId}" class="result-textarea" readonly>${rawData}</textarea>
+                        <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+                            <button class="md-btn" style="width: auto; padding: 10px 20px; font-size: 14px;" onclick="copyToClipboard('${textId}')">
+                                <span class="material-symbols-outlined" style="font-size: 18px;">content_copy</span> Copy All
+                            </button>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+            if(container.innerHTML === '') {
+                container.innerHTML = '<div style="text-align:center; padding: 40px; color: var(--md-sys-color-on-surface-variant);"><span class="material-symbols-outlined" style="font-size: 48px; opacity: 0.5;">sentiment_dissatisfied</span><p>No valid numbers found.</p></div>';
+            }
+        }
+
+        function downloadFile(country, data, count, range, payterm) {
+            const filename = (payterm && range) ? `${payterm}_${range}(${count}).txt` : `${country}(${count}).txt`;
+            const blob = new Blob([data], { type: 'text/plain' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            showToast(`Downloaded ${filename}`);
+        }
+    </script>
+</body>
+</html>
+
